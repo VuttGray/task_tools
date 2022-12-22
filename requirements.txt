@@ -2,5 +2,7 @@ google-api-python-client
 google-auth-oauthlib
 jira
 python-dateutil
-todoist-python
+requests
+setuptools
 TogglPy
+todoist-api-python>=2.0.2

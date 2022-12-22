@@ -3,7 +3,7 @@ Description
 
 Wrappers for task management applications
 
-- Todoist
+- Todoist (REST v2)
 - Toggl
 - Jira
 - Google Calendar

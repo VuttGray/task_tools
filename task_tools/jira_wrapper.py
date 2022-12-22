@@ -2,9 +2,13 @@ from enum import Enum, auto
 from logging import getLogger
 from re import findall
 
+import requests
+import requests.packages.urllib3
 from dateutil.parser import parse as dtu_parse
 from jira import JIRA, Issue, JIRAError  # Documentation: https://jira.readthedocs.io/en/master/api.html#jira
+from requests.auth import HTTPBasicAuth
 
+requests.packages.urllib3.disable_warnings()
 logger = getLogger('logger')
 
 
@@ -20,6 +24,10 @@ class IssueStatus(Enum):
 
 
 class JiraIssueNotFound(JIRAError):
+    pass
+
+
+class JiraUnavailable(JIRAError):
     pass
 
 
@@ -54,6 +62,25 @@ def find_jira_keys(text):
         yield key
 
 
+def get_issue_link(key) -> str:
+    return f'{conf.jira_server}/browse/{key}'
+
+
+def check_service():
+    try:
+        r = requests.get(conf.jira_server,
+                         verify=conf.ssl_cert_path,
+                         timeout=1)
+        if r.status_code == 401:
+            r = requests.get(conf.jira_server,
+                             verify=conf.ssl_cert_path,
+                             auth=HTTPBasicAuth(conf.login, conf.password))
+        r.raise_for_status()
+    except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectTimeout) as ex:
+        logger.exception(ex)
+        raise JiraUnavailable
+
+
 class JiraIssue:
     CLOSURE_STATUSES = ['Closed', 'Fixed', 'Resolved', 'Canceled', 'Rejected', 'Declassified']
 
@@ -69,12 +96,9 @@ class JiraIssue:
         self.status = issue.fields.status.name
 
 
-def get_issue_link(key) -> str:
-    return f'{conf.jira_server}/browse/{key}'
-
-
 class JiraWrapper:
     def __init__(self):
+        check_service()
         self.__jira = JIRA(options={'server': conf.jira_server, 'verify': conf.ssl_cert_path},
                            basic_auth=(conf.login, conf.password))
         logger.info('Jira wrapper created')
@@ -110,12 +134,13 @@ class JiraWrapper:
             logger.info(f'Released Jira version {version_name}')
 
     def create_new_version(self, project, name, start_date, release_date, description=None):
+        logger.debug(f'JW: Jira version {name} creation')
         self.__jira.create_version(project=project,
                                    name=name,
                                    startDate=start_date.strftime('%Y-%m-%d'),
                                    releaseDate=release_date.strftime('%Y-%m-%d'),
                                    description=description)
-        logger.info(f'Created Jira version {name}')
+        logger.info(f'Jira version {name} created')
 
     def get_unreleased_versions(self, project):
         return [v.name for v in self.__jira.project_versions(project) if not v.released and not v.archived]
