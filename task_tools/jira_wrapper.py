@@ -3,12 +3,12 @@ from logging import getLogger
 from re import findall
 
 import requests
-import requests.packages.urllib3
+from urllib3 import disable_warnings
 from dateutil.parser import parse as dtu_parse
 from jira import JIRA, Issue, JIRAError  # Documentation: https://jira.readthedocs.io/en/master/api.html#jira
 from requests.auth import HTTPBasicAuth
 
-requests.packages.urllib3.disable_warnings()
+disable_warnings()
 logger = getLogger('logger')
 
 

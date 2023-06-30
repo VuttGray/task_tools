@@ -6,3 +6,4 @@ requests
 setuptools
 TogglPy
 todoist-api-python>=2.0.2
+urllib3
