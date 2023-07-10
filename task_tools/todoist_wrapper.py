@@ -59,7 +59,7 @@ class TodoistWrapper:
         self.labels = self.get_labels()
         logger.info('Todoist wrapper created')
 
-    def add(self, content, due, labels, project=None, priority=None) -> str:
+    def add(self, content: str, due: str, labels: list[str], project: str = None, priority: int = None) -> str:
         """
         Add task into Todoist
         """
