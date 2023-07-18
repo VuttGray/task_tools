@@ -28,9 +28,11 @@ class TodoistConfig:
         self.token = kwargs.pop('token')
         if len(self.token) == 0:
             raise ValueError("Token is not specified for todoist wrapper")
-        dl = kwargs.pop('duration_labels', {})
+        dl = kwargs.pop('todoist_duration_labels', {})
         if dl:
             self.duration_labels = {key: DurationLabel(**value) for key, value in dl.items()}
+        else:
+            self.duration_labels = {}
 
 
 logger = getLogger('logger')
