@@ -8,6 +8,18 @@ import urllib3
 urllib3.disable_warnings()
 
 
+class ItemTypes:
+    Undefined = 0
+    Coding = 1
+    Testing = 2
+    Review = 3
+    Discussion = 4
+    Meeting = 5
+    Waiting = 6
+    Assigning = 7
+    Other = 8
+
+
 ITEM_PRIORITIES = {
     'low': 0,
     'medium': 1,
@@ -106,6 +118,7 @@ class PtmItem:
         self.summary = src.get('summary')
         self.description = "" if src.get('description') is None else src.get('description')
         self.planned_date = dt_parser.parse(src.get('plannedDate')) if src.get('plannedDate') else None
+        self.external_links = [link['externalEntryId'].lower() for link in src.get('externalLinks', [])]
 
 
 class PtmWrapper:
@@ -114,17 +127,28 @@ class PtmWrapper:
 
     def add(self, summary: str,
             duration: int,
+            type_id: int,
             tags: list[str] = None,
             planned_date: (dt.datetime | dt.date | None) = None,
             priority: str = "medium",
-            project: str = None) -> PtmItem:
+            project: str = None,
+            description: str = None,
+            external_link: (str, str) = None) -> PtmItem:
         """
         Add task into PTM
         """
         project_id = self.find_project(project)
         priority_id = ITEM_PRIORITIES[priority.lower()] if priority.lower() in ITEM_PRIORITIES else 1
         item_tags = self.find_item_tags(0, tags)
-        item = self.__create_item(summary, duration, item_tags, planned_date, priority_id, project_id)
+        item = self.__create_item(summary=summary,
+                                  duration=duration,
+                                  type_id=type_id,
+                                  item_tags=item_tags,
+                                  planned_date=planned_date,
+                                  priority_id=priority_id,
+                                  project_id=project_id,
+                                  description=description,
+                                  external_link=external_link)
         logger.debug(f'PTM item {summary} created')
         return item
 
@@ -161,6 +185,7 @@ class PtmWrapper:
         for item in items:
             if (search is None
                 or search.lower() in item.summary.lower()
+                or search.lower() in item.external_links
                 or search.lower() in item.description.lower())\
                     and (date is None or (item.planned_date and item.planned_date.date() == date)):
                 found_tasks.append(item)
@@ -173,6 +198,7 @@ class PtmWrapper:
     @staticmethod
     def __create_item(summary: str,
                       duration: int,
+                      type_id: int,
                       item_tags: list[PtmItemTag],
                       planned_date: (dt.datetime | dt.date | None) = None,
                       priority_id: int = 1,
@@ -182,13 +208,15 @@ class PtmWrapper:
                       due_date: dt.datetime = None,
                       closed_date: dt.datetime = None,
                       is_background: bool = False,
-                      recurrence_string: str = None) -> PtmItem:
+                      recurrence_string: str = None,
+                      external_link: (str, str) = None) -> PtmItem:
         data = {
             'summary': summary,
             'description': description,
+            'type': type_id,
             "plannedDate": planned_date.isoformat() if planned_date else None,
             'estimatedTime': duration,
-            'tags': [{'itemId': it.item_id, 'tagId': it.tag_id} for it in item_tags],
+            'tags': [{'tagId': it.tag_id} for it in item_tags],
             'priority': priority_id,
             'projectId': project_id,
             "startDate": start_date.isoformat() if start_date else None,
@@ -196,6 +224,7 @@ class PtmWrapper:
             "closedDate": closed_date.isoformat() if closed_date else None,
             'isBackground': is_background,
             "recurrenceString": recurrence_string,
+            "externalLinks": [{"externalEntity": external_link[0], "externalEntryId": external_link[1]}],
         }
         endpoint = f"{conf.api_url}/Item/Create"
         request_json = json.dumps(data)
