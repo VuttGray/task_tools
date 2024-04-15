@@ -1,9 +1,12 @@
 import datetime as dt
-import logging
-import requests
 import json
-from dateutil import parser as dt_parser
+import logging
+
+import requests
 import urllib3
+from dateutil import parser as dt_parser
+
+from task_tools.api_wrapper import api_post, api_get
 
 urllib3.disable_warnings()
 
@@ -140,6 +143,7 @@ class PtmWrapper:
         project_id = self.find_project(project)
         priority_id = ITEM_PRIORITIES[priority.lower()] if priority.lower() in ITEM_PRIORITIES else 1
         item_tags = self.find_item_tags(0, tags)
+        description_id = self.__create_description(description) if description else None
         item = self.__create_item(summary=summary,
                                   duration=duration,
                                   type_id=type_id,
@@ -147,7 +151,7 @@ class PtmWrapper:
                                   planned_date=planned_date,
                                   priority_id=priority_id,
                                   project_id=project_id,
-                                  description=description,
+                                  description_id=description_id,
                                   external_link=external_link)
         logger.debug(f'PTM item {summary} created')
         return item
@@ -196,79 +200,65 @@ class PtmWrapper:
             return True
 
     @staticmethod
+    def __create_description(description: str = None) -> int:
+        data = {'text': description}
+        endpoint = f"{conf.api_url}/Description"
+        params = {'userLogin': conf.user_login}
+        request_json = json.dumps(data)
+        response_json = api_post(endpoint, request_json, params)
+        return int(response_json["id"])
+
+    @staticmethod
     def __create_item(summary: str,
                       duration: int,
                       type_id: int,
                       item_tags: list[PtmItemTag],
                       planned_date: (dt.datetime | dt.date | None) = None,
                       priority_id: int = 1,
-                      project_id: int = None,
-                      description: str = None,
                       start_date: dt.datetime = None,
                       due_date: dt.datetime = None,
                       closed_date: dt.datetime = None,
                       is_background: bool = False,
                       recurrence_string: str = None,
+                      project_id: int = None,
+                      description_id: int = None,
                       external_link: (str, str) = None) -> PtmItem:
         data = {
             'summary': summary,
-            'description': description,
-            'type': type_id,
-            "plannedDate": planned_date.isoformat() if planned_date else None,
             'estimatedTime': duration,
+            'type': type_id,
             'tags': [{'tagId': it.tag_id} for it in item_tags],
+            "plannedDate": planned_date.isoformat() if planned_date else None,
             'priority': priority_id,
-            'projectId': project_id,
             "startDate": start_date.isoformat() if start_date else None,
             "dueDate": due_date.isoformat() if due_date else None,
             "closedDate": closed_date.isoformat() if closed_date else None,
             'isBackground': is_background,
             "recurrenceString": recurrence_string,
+            'projectId': project_id,
+            'descriptionId': description_id,
             "externalLinks": [{"externalEntity": external_link[0], "externalEntryId": external_link[1]}],
         }
-        endpoint = f"{conf.api_url}/Item/Create"
+        endpoint = f"{conf.api_url}/Item"
+        params = {'userLogin': conf.user_login}
         request_json = json.dumps(data)
-        response_json = PtmWrapper.api_post(endpoint, request_json)
+        response_json = api_post(endpoint, request_json, params)
         return PtmItem(response_json)
 
     @staticmethod
     def get_tags() -> list[PtmTag]:
-        endpoint = f"{conf.api_url}/Tag/GetAll"
-        response_json = PtmWrapper.api_get(endpoint)
+        endpoint = f"{conf.api_url}/Tag"
+        response_json = api_get(endpoint)
         return [PtmTag(item) for item in response_json]
 
     @staticmethod
     def get_projects() -> list[PtmProject]:
-        endpoint = f"{conf.api_url}/Project/GetAll"
-        response_json = PtmWrapper.api_get(endpoint)
+        endpoint = f"{conf.api_url}/Project"
+        response_json = api_get(endpoint)
         return [PtmProject(item) for item in response_json]
 
     @staticmethod
     def get_items() -> list[PtmItem]:
-        endpoint = f"{conf.api_url}/Item/GetOpen"
-        response_json = PtmWrapper.api_get(endpoint)
+        endpoint = f"{conf.api_url}/Item/Open"
+        response_json = api_get(endpoint)
         return [PtmItem(item) for item in response_json]
-
-    @staticmethod
-    def api_get(endpoint: str) -> json:
-        try:
-            response = requests.get(endpoint, verify=False)
-        except requests.exceptions.ConnectionError as ex:
-            logger.debug(ex)
-            raise PtmApiNotResponseException(endpoint)
-        if response.status_code == 200:
-            return json.loads(response.text)
-
-    @staticmethod
-    def api_post(endpoint: str, request_json: json) -> json:
-        headers = {'Content-Type': 'application/json', 'Accept': 'text/plain'}
-        params = {'userLogin': conf.user_login}
-        try:
-            response = requests.post(endpoint, data=request_json, params=params, headers=headers, verify=False)
-        except requests.exceptions.ConnectionError as ex:
-            logger.debug(ex)
-            raise PtmApiNotResponseException(endpoint)
-        if response.status_code == 200:
-            return json.loads(response.text)
-        else:
-            raise PtmApiBadRequestException(response)
