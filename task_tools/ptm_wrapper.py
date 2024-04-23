@@ -143,7 +143,6 @@ class PtmWrapper:
         project_id = self.find_project(project)
         priority_id = ITEM_PRIORITIES[priority.lower()] if priority.lower() in ITEM_PRIORITIES else 1
         item_tags = self.find_item_tags(0, tags)
-        description_id = self.__create_description(description) if description else None
         item = self.__create_item(summary=summary,
                                   duration=duration,
                                   type_id=type_id,
@@ -151,7 +150,7 @@ class PtmWrapper:
                                   planned_date=planned_date,
                                   priority_id=priority_id,
                                   project_id=project_id,
-                                  description_id=description_id,
+                                  description=description,
                                   external_link=external_link)
         logger.debug(f'PTM item {summary} created')
         return item
@@ -200,15 +199,6 @@ class PtmWrapper:
             return True
 
     @staticmethod
-    def __create_description(description: str = None) -> int:
-        data = {'text': description}
-        endpoint = f"{conf.api_url}/Description"
-        params = {'userLogin': conf.user_login}
-        request_json = json.dumps(data)
-        response_json = api_post(endpoint, request_json, params)
-        return int(response_json["id"])
-
-    @staticmethod
     def __create_item(summary: str,
                       duration: int,
                       type_id: int,
@@ -221,13 +211,13 @@ class PtmWrapper:
                       is_background: bool = False,
                       recurrence_string: str = None,
                       project_id: int = None,
-                      description_id: int = None,
+                      description: str = None,
                       external_link: (str, str) = None) -> PtmItem:
         data = {
             'summary': summary,
             'estimatedTime': duration,
             'type': type_id,
-            'tags': [{'tagId': it.tag_id} for it in item_tags],
+            'itemTags': [{'tagId': it.tag_id} for it in item_tags],
             "plannedDate": planned_date.isoformat() if planned_date else None,
             'priority': priority_id,
             "startDate": start_date.isoformat() if start_date else None,
@@ -236,7 +226,7 @@ class PtmWrapper:
             'isBackground': is_background,
             "recurrenceString": recurrence_string,
             'projectId': project_id,
-            'descriptionId': description_id,
+            'description': {"text": description} if description else None,
             "externalLinks": [{"externalEntity": external_link[0], "externalEntryId": external_link[1]}],
         }
         endpoint = f"{conf.api_url}/Item"
