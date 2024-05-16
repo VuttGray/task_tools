@@ -73,7 +73,7 @@ class PtmApiNotResponseException(PtmWrapperBaseException):
         super().__init__(self.message)
 
 
-class PtmProject:
+class PtmHelper:
     @property
     def id(self) -> id:
         return self.__id
@@ -85,7 +85,6 @@ class PtmProject:
     def __init__(self, src: dict):
         self.__id = src.get('id')
         self.__name = src.get('name')
-
 
 class PtmItemTag:
     @property
@@ -135,12 +134,14 @@ class PtmWrapper:
             planned_date: (dt.datetime | dt.date | None) = None,
             priority: str = "medium",
             project: str = None,
+            routine_area: str = None,
             description: str = None,
             external_link: (str, str) = None) -> PtmItem:
         """
         Add task into PTM
         """
-        project_id = self.find_project(project)
+        project_id = self.find_helper_item('Project', project)
+        routine_area_id = self.find_helper_item('RoutineArea', routine_area)
         priority_id = ITEM_PRIORITIES[priority.lower()] if priority.lower() in ITEM_PRIORITIES else 1
         item_tags = self.find_item_tags(0, tags)
         item = self.__create_item(summary=summary,
@@ -150,20 +151,22 @@ class PtmWrapper:
                                   planned_date=planned_date,
                                   priority_id=priority_id,
                                   project_id=project_id,
+                                  routine_area_id=routine_area_id,
                                   description=description,
                                   external_link=external_link)
         logger.debug(f'PTM item {summary} created')
         return item
 
-    def find_project(self, project_name: str) -> int:
-        if project_name:
-            project_id = 0
-            for project in self.get_projects():
-                if project.name.lower() == project_name.lower():
-                    project_id = project.id
-            if project_id is None or project_id <= 0:
-                raise PtmValidationException(f'Project {project_name} not found')
-            return project_id
+    def find_helper_item(self, helper_name: str, value: str) -> int:
+        if value:
+            item_id = 0
+            helper = self.get_helper(helper_name)
+            for item in helper:
+                if item.name.lower() == value.lower():
+                    item_id = item.id
+            if item_id is None or item_id <= 0:
+                raise PtmValidationException(f'{helper_name} {value} not found')
+            return item_id
 
     def find_tag(self, tag_name: str) -> int:
         tag_id = 0
@@ -211,6 +214,7 @@ class PtmWrapper:
                       is_background: bool = False,
                       recurrence_string: str = None,
                       project_id: int = None,
+                      routine_area_id: int = None,
                       description: str = None,
                       external_link: (str, str) = None) -> PtmItem:
         data = {
@@ -226,6 +230,7 @@ class PtmWrapper:
             'isBackground': is_background,
             "recurrenceString": recurrence_string,
             'projectId': project_id,
+            "routineAreaId": routine_area_id,
             'description': {"text": description} if description else None,
             "externalLinks": [{"externalEntity": external_link[0], "externalEntryId": external_link[1]}],
         }
@@ -242,10 +247,22 @@ class PtmWrapper:
         return [PtmTag(item) for item in response_json]
 
     @staticmethod
-    def get_projects() -> list[PtmProject]:
+    def get_helper(helper_name: str) -> list[PtmHelper]:
+        endpoint = f"{conf.api_url}/{helper_name}"
+        response_json = api_get(endpoint)
+        return [PtmHelper(item) for item in response_json]
+
+    @staticmethod
+    def get_projects() -> list[PtmHelper]:
         endpoint = f"{conf.api_url}/Project"
         response_json = api_get(endpoint)
-        return [PtmProject(item) for item in response_json]
+        return [PtmHelper(item) for item in response_json]
+
+    @staticmethod
+    def get_routine_areas() -> list[PtmHelper]:
+        endpoint = f"{conf.api_url}/RoutineArea"
+        response_json = api_get(endpoint)
+        return [PtmHelper(item) for item in response_json]
 
     @staticmethod
     def get_items() -> list[PtmItem]:
