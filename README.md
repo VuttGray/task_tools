@@ -7,3 +7,4 @@ Wrappers for task management applications
 - Toggl
 - Jira
 - Google Calendar
+- Azure DevOps
