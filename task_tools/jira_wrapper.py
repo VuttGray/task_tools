@@ -5,7 +5,7 @@ from re import findall
 import requests
 from urllib3 import disable_warnings
 from dateutil.parser import parse as dtu_parse
-from jira import JIRA, Issue, JIRAError  # Documentation: https://jira.readthedocs.io/en/master/api.html#jira
+from jira import JIRA, Issue, JIRAError  # Documentation: https://jira.readthedocs.io
 from requests.auth import HTTPBasicAuth
 
 disable_warnings()
@@ -91,9 +91,12 @@ class JiraIssue:
     def __init__(self, issue: Issue):
         self.key = issue.key
         self.reporter = issue.fields.reporter.displayName
-        self.team_id = issue.fields.customfield_10600.id if issue.fields.customfield_10600 else None
         self.closed_date = dtu_parse(issue.fields.resolutiondate) if issue.fields.resolutiondate else None
         self.status = issue.fields.status.name
+        if 'customfield_10600' in issue.fields.__dict__ and issue.fields.customfield_10600:
+            self.team_id = issue.fields.customfield_10600.id
+        else:
+            self.team_id = None
 
 
 class JiraWrapper:
