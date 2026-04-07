@@ -1,3 +1,3 @@
 __author__ = 'vutt.gray@gmail.com'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __package__ = 'task_tools'

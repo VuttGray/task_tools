@@ -140,8 +140,8 @@ class PtmWrapper:
         """
         Add task into PTM
         """
-        project_id = self.find_helper_item('Project', project)
-        routine_area_id = self.find_helper_item('RoutineArea', routine_area)
+        project_id = self.find_helper_item('projects', project)
+        routine_area_id = self.find_helper_item('routineareas', routine_area)
         priority_id = ITEM_PRIORITIES[priority.lower()] if priority.lower() in ITEM_PRIORITIES else 1
         item_tags = self.find_item_tags(0, tags)
         item = self.__create_item(summary=summary,
@@ -234,7 +234,7 @@ class PtmWrapper:
             'description': {"text": description} if description else None,
             "externalLinks": [{"externalEntity": external_link[0], "externalEntryId": external_link[1]}],
         }
-        endpoint = f"{conf.api_url}/Item"
+        endpoint = f"{conf.api_url}/items"
         params = {'userLogin': conf.user_login}
         request_json = json.dumps(data)
         response_json = api_post(endpoint, request_json, params)
@@ -242,7 +242,7 @@ class PtmWrapper:
 
     @staticmethod
     def get_tags() -> list[PtmTag]:
-        endpoint = f"{conf.api_url}/Tag"
+        endpoint = f"{conf.api_url}/tags"
         response_json = api_get(endpoint)
         return [PtmTag(item) for item in response_json]
 
@@ -254,18 +254,18 @@ class PtmWrapper:
 
     @staticmethod
     def get_projects() -> list[PtmHelper]:
-        endpoint = f"{conf.api_url}/Project"
+        endpoint = f"{conf.api_url}/projects"
         response_json = api_get(endpoint)
         return [PtmHelper(item) for item in response_json]
 
     @staticmethod
     def get_routine_areas() -> list[PtmHelper]:
-        endpoint = f"{conf.api_url}/RoutineArea"
+        endpoint = f"{conf.api_url}/routineareas"
         response_json = api_get(endpoint)
         return [PtmHelper(item) for item in response_json]
 
     @staticmethod
     def get_items() -> list[PtmItem]:
-        endpoint = f"{conf.api_url}/Item/Open"
+        endpoint = f"{conf.api_url}/items/open"
         response_json = api_get(endpoint)
         return [PtmItem(item) for item in response_json]
