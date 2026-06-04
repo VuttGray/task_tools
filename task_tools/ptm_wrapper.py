@@ -231,7 +231,7 @@ class PtmWrapper:
             "recurrenceString": recurrence_string,
             'projectId': project_id,
             "routineAreaId": routine_area_id,
-            'description': {"text": description} if description else None,
+            'description': description,
             "externalLinks": [{"externalEntity": external_link[0], "externalEntryId": external_link[1]}],
         }
         endpoint = f"{conf.api_url}/items"
