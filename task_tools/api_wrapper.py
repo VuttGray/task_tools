@@ -36,7 +36,10 @@ def api_get(endpoint: str) -> json:
         raise ApiNotResponseException(endpoint)
 
     if response.status_code == 200:
-        return json.loads(response.text)
+        logger.debug(response.text)
+        json_response = json.loads(response.text)
+        logger.debug(json_response)
+        return json_response.data if json_response.data else json_response
     else:
         raise ApiBadRequestException(response)
 
