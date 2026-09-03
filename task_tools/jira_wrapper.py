@@ -7,6 +7,7 @@ from urllib3 import disable_warnings
 from dateutil.parser import parse as dtu_parse
 from jira import JIRA, Issue, JIRAError  # Documentation: https://jira.readthedocs.io
 from requests.auth import HTTPBasicAuth
+from urllib3.util import timeout
 
 disable_warnings()
 logger = getLogger('logger')
@@ -39,12 +40,13 @@ class JiraConfig:
         self.ssl_cert_path = kwargs.pop('ssl_cert_path')
         if len(self.ssl_cert_path) == 0:
             raise ValueError("Path to SSL certificate is not specified for jira wrapper")
+        self.pat = kwargs.pop('pat')
         self.login = kwargs.pop('login')
-        if len(self.login) == 0:
-            raise ValueError("Login is not specified for jira wrapper")
+        if len(self.login) + len(self.pat) == 0:
+            raise ValueError("Login or PAT should be specified for jira wrapper")
         self.password = kwargs.pop('password')
-        if len(self.password) == 0:
-            raise ValueError("Password is not specified for jira wrapper")
+        if len(self.password) + len(self.pat) == 0:
+            raise ValueError("Password or PAT is not specified for jira wrapper")
 
 
 conf: JiraConfig
@@ -72,9 +74,18 @@ def check_service():
                          verify=conf.ssl_cert_path,
                          timeout=1)
         if r.status_code == 401:
-            r = requests.get(conf.jira_server,
-                             verify=conf.ssl_cert_path,
-                             auth=HTTPBasicAuth(conf.login, conf.password))
+            headers = {"Accept": "application/json"}
+            auth = None
+            if conf.pat:
+                headers["Authorization"] = f"Bearer {conf.pat}"
+            elif conf.login and conf.password:
+                auth = HTTPBasicAuth(conf.login, conf.password)
+            r = requests.get(
+                conf.jira_server,
+                headers=headers,
+                auth=auth,
+                verify=conf.ssl_cert_path,
+                timeout=5)
         r.raise_for_status()
     except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectTimeout) as ex:
         logger.exception(ex)
@@ -102,8 +113,8 @@ class JiraIssue:
 class JiraWrapper:
     def __init__(self):
         check_service()
-        self.__jira = JIRA(options={'server': conf.jira_server, 'verify': conf.ssl_cert_path},
-                           basic_auth=(conf.login, conf.password))
+        auth = {'basic_auth': (conf.login, conf.password)} if conf.login and conf.password else {'token_auth': conf.pat}
+        self.__jira = JIRA(options={'server': conf.jira_server, 'verify': conf.ssl_cert_path}, **auth)
         logger.info('Jira wrapper created')
 
     def get_issue(self, issue_key) -> Issue:
